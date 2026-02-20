@@ -7,17 +7,25 @@ use App\Entity\Comment;
 use App\Entity\Rating;
 use App\Form\BlogType;
 use App\Repository\BlogRepository;
-use App\Repository\RatingRepository; // Une seule fois !
+use App\Repository\RatingRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface; // Ajouter pour valider reCAPTCHA
 
 #[Route('/blog')]
 final class BlogController extends AbstractController
 {
+    private $httpClient;
+    
+    public function __construct(HttpClientInterface $httpClient)
+    {
+        $this->httpClient = $httpClient;
+    }
+
     #[Route(name: 'app_blog_index', methods: ['GET'])]
     public function index(BlogRepository $blogRepository): Response
     {
@@ -96,6 +104,8 @@ final class BlogController extends AbstractController
         return $this->redirectToRoute('app_blog_index', [], Response::HTTP_SEE_OTHER);
     }
 
+    // ======================= 📝 COMMENTAIRES AVEC RECAPTCHA =======================
+    
     #[Route('/{id}/comment', name: 'app_blog_comment', methods: ['POST'])]
     public function addComment(Request $request, int $id, BlogRepository $blogRepository, EntityManagerInterface $em): Response
     {
@@ -110,6 +120,46 @@ final class BlogController extends AbstractController
             return $this->redirectToRoute('app_blog_user_index');
         }
 
+        // 🔐 VALIDATION RECAPTCHA
+        $recaptchaResponse = $request->request->get('g-recaptcha-response');
+        
+        if (!$recaptchaResponse) {
+            $this->addFlash('error', 'Please complete the reCAPTCHA verification.');
+            return $this->redirectToRoute('app_blog_show', ['id' => $blog->getId()]);
+        }
+
+        // Vérifier le token reCAPTCHA auprès de Google
+        $secretKey = $_ENV['EWZ_RECAPTCHA_SECRET'] ?? '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'; // Clé de test par défaut
+        
+        try {
+            $response = $this->httpClient->request('POST', 'https://www.google.com/recaptcha/api/siteverify', [
+                'body' => [
+                    'secret' => $secretKey,
+                    'response' => $recaptchaResponse,
+                    'remoteip' => $request->getClientIp()
+                ]
+            ]);
+            
+            $result = $response->toArray();
+            
+            if (!isset($result['success']) || $result['success'] !== true) {
+                $errorCodes = isset($result['error-codes']) ? implode(', ', $result['error-codes']) : 'Unknown error';
+                $this->addFlash('error', 'reCAPTCHA verification failed. Please try again. (Erreur: ' . $errorCodes . ')');
+                return $this->redirectToRoute('app_blog_show', ['id' => $blog->getId()]);
+            }
+            
+            // Score optionnel (pour reCAPTCHA v3)
+            if (isset($result['score']) && $result['score'] < 0.5) {
+                $this->addFlash('error', 'Suspicious activity detected. Your comment has been rejected.');
+                return $this->redirectToRoute('app_blog_show', ['id' => $blog->getId()]);
+            }
+            
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Error validating reCAPTCHA. Please try again.');
+            return $this->redirectToRoute('app_blog_show', ['id' => $blog->getId()]);
+        }
+
+        // Si reCAPTCHA est valide, traiter le commentaire
         $content = $request->request->get('content');
         if ($content) {
             $comment = new Comment();

@@ -74,7 +74,7 @@
                         </div>
                     {% endif %}
 
-                    <!-- Comment Form -->
+                    <!-- Comment Form with reCAPTCHA -->
                     {% if app.user %}
                         <div class="mt-4 p-4" style="background-color: white; border-radius: 8px;">
                             <h5 class="mb-3" style="color: #000000;">Add a Comment</h5>
@@ -87,6 +87,12 @@
                                               style="border: 1px solid #ced4da; border-radius: 6px; padding: 15px; color: #000000;"
                                               required></textarea>
                                 </div>
+                                
+                                <!-- 🔐 reCAPTCHA Widget -->
+                                <div class="mb-3">
+                                    <div class="g-recaptcha" data-sitekey="{{ app.request.server.get('EWZ_RECAPTCHA_SITE_KEY') | default('6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI') }}"></div>
+                                </div>
+                                
                                 <button type="submit" class="btn btn-primary">Submit Comment</button>
                             </form>
                         </div>
@@ -160,6 +166,9 @@
     </div>
 </section>
 
+<!-- 🔐 Script reCAPTCHA Google -->
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
 <style>
 /* ⭐ Rating Stars CSS */
 .star-btn {
@@ -220,10 +229,37 @@
     padding: 12px 20px;
     border-radius: 6px;
     margin-bottom: 15px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .rating-stats {
     font-size: 0.9rem;
+}
+
+/* Style pour le widget reCAPTCHA */
+.g-recaptcha {
+    margin: 15px 0;
+    transform: scale(1);
+    transform-origin: 0 0;
+}
+
+/* Responsive pour mobile */
+@media (max-width: 480px) {
+    .g-recaptcha {
+        transform: scale(0.8);
+        transform-origin: 0 0;
+    }
 }
 </style>
 
@@ -267,6 +303,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    });
+
+    // Auto-hide alerts after 5 seconds
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            alert.style.transition = 'opacity 0.5s';
+            alert.style.opacity = '0';
+            setTimeout(() => alert.remove(), 500);
+        }, 5000);
     });
 });
 </script>
