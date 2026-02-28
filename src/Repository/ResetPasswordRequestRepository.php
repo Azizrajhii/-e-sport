@@ -11,7 +11,6 @@ use SymfonyCasts\Bundle\ResetPassword\Persistence\Repository\ResetPasswordReques
 
 /**
  * @extends ServiceEntityRepository<ResetPasswordRequest>
- * @implements ResetPasswordRequestRepositoryInterface
  */
 class ResetPasswordRequestRepository extends ServiceEntityRepository implements ResetPasswordRequestRepositoryInterface
 {
@@ -24,6 +23,10 @@ class ResetPasswordRequestRepository extends ServiceEntityRepository implements 
 
     public function createResetPasswordRequest(object $user, \DateTimeInterface $expiresAt, string $selector, string $hashedToken): ResetPasswordRequestInterface
     {
+        if (!$expiresAt instanceof \DateTimeImmutable) {
+            $expiresAt = \DateTimeImmutable::createFromMutable(new \DateTime($expiresAt->format('Y-m-d H:i:s')));
+        }
+
         return new ResetPasswordRequest($user, $expiresAt, $selector, $hashedToken);
     }
 }

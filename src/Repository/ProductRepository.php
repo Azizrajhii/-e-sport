@@ -15,6 +15,33 @@ class ProductRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Product::class);
     }
+    /**
+     * Search products by name
+     *
+     * @return Product[]
+     */
+    public function search(string $query): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.name LIKE :q')
+            ->setParameter('q', '%' . $query . '%')
+            ->orderBy('p.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Return all products ordered by creation date descending
+     *
+     * @return Product[]
+     */
+    public function findAllOrdered(): array
+    {
+        return $this->createQueryBuilder('p')
+            ->orderBy('p.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
 // src/Repository/ProductRepository.php
 
 public function findTopSales(int $limit = 3): array
